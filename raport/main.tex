@@ -1,0 +1,204 @@
+﻿\documentclass[10pt,twocolumn,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{polski,lmodern}
+\usepackage[margin=18mm,columnsep=7mm]{geometry}
+\usepackage{microtype,graphicx}
+\usepackage{booktabs,tabularx,array}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem,placeins,xcolor,xurl,float,needspace,etoolbox}
+\usepackage[hidelinks,breaklinks=true]{hyperref}
+\hypersetup{pdftitle={Przewidywanie wskaźnika C/Z spółek giełdowych}}
+\setlist[itemize]{leftmargin=*,itemsep=1pt,topsep=3pt}
+\setlength{\emergencystretch}{1em}
+\raggedbottom
+\pretocmd{\section}{\Needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\Needspace{5\baselineskip}}{}{}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\abstractname}{Streszczenie}
+
+\newcommand{\TematProjektu}{Przewidywanie wskaźnika C/Z spółek giełdowych}
+\newcommand{\TypZadania}{regresja}
+\newcommand{\pole}[1]{\textit{[#1]}}
+
+\title{\TematProjektu\\[2mm]
+\large Zaawansowane metody uczenia maszynowego}
+\author{Imię i nazwisko autora 1\\\small Numer albumu
+\and \pole{Imię i nazwisko autora 2}\\\small \pole{Numer albumu}}
+\date{\quad \today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Celem projektu jest przewidzenie wskaźnika cena/zysk (C/Z, ang. P/E) spółki giełdowej na podstawie jej wskaźników finansowych z ostatnich czterech kwartałów. Jako cel modelowania przyjmujemy logarytm C/Z, bo rozkład C/Z jest silnie skośny. Dane pochodzą z zestawu \emph{Global Stock Market Dataset} (Kaggle). Po oczyszczeniu zostało 4\,677 spółek z wartością C/Z. Podział jest grupowy (kopie tej samej spółki trafiają do jednego zbioru), 70/15/15, a wyniki liczymy dla 20 losowych podziałów. Wybrany model to regresja liniowa na 13 cechach liczbowych oraz sektorze, z uzupełnianiem braków medianą. Na zbiorze testowym osiąga RMSE w skali logarytmicznej 0,950 wobec 1,164 dla prostego punktu odniesienia (stała średnia). Oznacza to poprawę o około 18\%. Jednocześnie R$^2$ wynosi tylko 0,33, czyli model wyjaśnia około jednej trzeciej zmienności. Dane giełdowe są bardzo zaszumione, a wybór metod został ograniczony przez braki danych i wartości skrajne. Wynik traktujemy jako rzetelny punkt odniesienia, a nie jako narzędzie inwestycyjne.
+\end{abstract}
+
+\section{Problem, motywacja i cel}
+\subsection{Pytanie predykcyjne}
+\textbf{Typ zadania:} \TypZadania{} (cel ciągły).
+\noindent\textbf{Kontrakt predykcji:}
+jednostka to spółka giełdowa w jednym momencie (migawka danych, bez osi czasu). Cel to $\log(\text{C/Z})$ (kolumna \texttt{price\_earnings\_ttm}). Cechy to wskaźniki rentowności, płynności, zadłużenia, wielkości firmy (logarytmy przychodów i aktywów) oraz sektor. Wszystkie cechy zakładamy jako znane w chwili wyceny. Zastosowanie: wstępna ocena, czy wycena C/Z spółki jest zgodna z jej wskaźnikami finansowymi.
+
+\subsection{Kryterium użyteczności}
+Model ma za zadanie przewidywanie stałej średniej C/Z dla każdej spółki. Ten baseline ma RMSE 1,164 na teście. Model jest użyteczny, jeśli wyraźnie go poprawia.
+
+\vfill\break
+\section{Dane i analiza wstępna}
+\subsection{Źródło i znaczenie kolumn}
+Dane: zestaw \emph{Global Stock Market Dataset} (Kaggle, autor Mehdi Aminazadeh), pobrany \pole{data pobrania}, licencja: \pole{licencja z Kaggle}. Plik bazowy ma 11\,806 wierszy i 10 kolumn. Po połączeniu plików są 36 kolumn, po wskaźnikach pochodnych 45. Wybrano 16 kolumn (13 cech liczbowych, sektor, ticker i cel). Po odrzuceniu wierszy bez C/Z zostaje 4\,677 spółek.
+
+\begin{table}[H]
+\centering
+\caption{Słownik danych używanych w modelu. Jednostki wskaźników jak w pliku źródłowym.}
+\label{tab:dane}
+\footnotesize
+\begin{tabularx}{\columnwidth}{@{}lYY@{}}
+\toprule
+Kolumna & Znaczenie & Rola\\
+\midrule
+\texttt{price\_earnings\_ttm} & C/Z (cena/zysk, 12 mies.) & cel (logarytmowany)\\
+\texttt{net\_margin\_ttm} & marża netto & cecha\\
+\texttt{operating\_margin\_ttm} & marża operacyjna & cecha\\
+\texttt{roe} & zwrot z kapitału własnego & cecha\\
+\texttt{roa} & zwrot z aktywów & cecha\\
+\texttt{dividend\_payout\_ratio\_ttm} & udział dywidendy w zysku & cecha\\
+\texttt{current\_ratio\_fq} & płynność bieżąca & cecha (braki)\\
+\texttt{quick\_ratio\_fq} & płynność szybka & cecha (braki)\\
+\texttt{cash\_ratio} & płynność gotówkowa & cecha (braki)\\
+\texttt{debt\_to\_equity\_fq} & dług do kapitału własnego & cecha\\
+\texttt{net\_debt\_to\_assets} & dług netto do aktywów & cecha\\
+\texttt{liab\_to\_assets} & zobowiązania do aktywów & cecha\\
+\texttt{slog\_revenue} & logarytm przychodów & cecha\\
+\texttt{slog\_assets} & logarytm aktywów & cecha\\
+\texttt{sector} & branża spółki (20 kategorii) & one-hot\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Przygotowanie danych: co usunięto}
+Dane przechodzą przez kilka etapów, a każdy odrzuca część spółek lub kolumn (Tabela \ref{tab:etapy}).
+
+\begin{table}[H]
+\centering
+\caption{Liczba spółek na kolejnych etapach przygotowania danych.}
+\label{tab:etapy}
+\footnotesize
+\begin{tabularx}{\columnwidth}{@{}Yr@{}}
+\toprule
+Etap & Spółki\\
+\midrule
+plik bazowy (\texttt{tradingview\_all\_stocks}) & 11\,806\\
+po usunięciu powtórek tickerów (131 wierszy) & 11\,675\\
+spółki z C/Z (bez C/Z: 6\,978) & 4\,697\\
+po usunięciu C/Z $<$ 0,1 & 4\,677\\
+z kompletem 13 cech (complete-case) & 3\,394\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Kto odpada.} (1) Spółki bez C/Z: źródło nie podaje wartości. Większość z nich (4\,706) ma ujemny zysk netto, więc C/Z nie ma sensu. (2) Spółki z C/Z poniżej 0,1 (20 przypadków): cena to mniej niż jedna dziesiąta rocznego zysku, co uznajemy za błąd jednostek (to hipoteza, nie pewność). Jedyny wyjątek od zasady, że odstających nie wycinamy. (3) Spółki z brakami w cechach: complete-case odpada 1\,283 z 4\,677 (27\%), dlatego w modelu używamy imputacji (sekcja 5). (4) Powtórki tickerów: ta sama spółka w kilku wierszach, zostaje pierwszy wiersz.
+
+\textbf{Kolumny.} Z 45 kolumn zostaje 16. Odrzucamy: kolumny zdradzające cel (np. kapitalizacja, bo C/Z to kapitalizacja podzielona przez zysk); ruch kursu (\texttt{change} i \texttt{Perf.*}, czyli stopy zwrotu, które mówią o nastrojach rynku, a nie o wynikach firmy); surowe kwoty, z których już policzono wskaźniki; kolumny z ponad 40\% braków (marże brutto, EBITDA i FCF); oraz \texttt{industry} (130 kategorii) i \texttt{exchange} (giełda, nie cecha firmy). Wartości zastępcze typu 999\,900\% w zmianach kursu zamieniamy na braki (136 komórek), a dzielenie przez zero (1\,834 wartości) też daje braki.
+
+\subsection{Jakość i struktura danych}
+Trudność danych giełdowych wynika z kilku rzeczy. Sygnał jest słaby: C/Z zależy też od oczekiwań i kursu, a nie tylko od bieżących wskaźników. Cel jest zaszumiony: gdy zysk jest bliski zera, C/Z przyjmuje bardzo duże wartości, więc go logarytmujemy i usuwamy oczywiste błędy jednostek (C/Z $<$ 0,1). Braki występują we wszystkich 13 cechach (od 0,1\% do 21,6\%), a są nierówno rozłożone: sektor Finance to 30,8\% treningu, ale 93,8\% spółek z brakiem płynności. Wiele spółek to kopie tej samej firmy (np. GOOG i GOOGL mają identyczne cechy), więc podział musi być grupowy. Wartości podejrzane zostają w danych, bo nie mamy dowodu, że są błędne (np. zwrot z aktywów (ROA) powyżej 100\% w 35 przypadkach).
+
+\textbf{Wartości odstające.} Na box-plotach wiele cech ma 10–25\% wartości poza wąsami. Surowe kwoty (aktywa, przychody, kapitalizacja) leżą nisko, a kropki sięgają bardzo wysoko; po logarytmie większość pudełek mieści się w rozsądnym zakresie. Zysk netto, wolny przepływ gotówki i EBITDA mają po logarytmie dwa garby, bo rozdzielają spółki na zyskowne i stratne. Kilka cech ma słupek dokładnie przy zerze (np. dług, dywidenda), bo część spółek go nie ma. Wartości odstające traktujemy jako rozkład, a nie błąd, więc nie usuwamy ich, z wyjątkiem C/Z poniżej 0,1.
+
+\subsection{Najważniejsze obserwacje z EDA}
+Po obcięciu do 99. percentyla i zlogarytmowaniu asymetria C/Z spada z 44,6 do ok. 1, więc logarytm jest właściwym celem.
+
+Korelacje (Rys. \ref{fig:korelacje}) pokazują, że cechy rentowności mają umiarkowany \emph{ujemny} związek z log(C/Z) (ROE $-0{,}35$, marża netto $-0{,}34$, ROA $-0{,}31$). Wskaźniki zadłużenia są prawie niezwiązane z C/Z.
+
+\textbf{Współliniowość.} Sześć par cech ma $|\rho| > 0{,}7$: przychody i aktywa ($0{,}91$), płynność bieżąca i szybka ($0{,}87$), ROE i ROA ($0{,}80$), dług do kapitału i zobowiązania do aktywów ($0{,}73$), gotówka i dług netto ($-0{,}73$), marża netto i operacyjna ($0{,}70$). Informacja w nich się powtarza. Zostawiamy jednak wszystkie 13 cech: wariant z 9 cechami dawał więcej kompletnych wierszy (4\,165 zamiast 3\,394), ale zostawiał nierozwiązane pary ROE/ROA i zadłużenia. Współczynniki pojedynczych cech z par są niestabilne, więc nie interpretujemy ich osobno. Osobna uwaga: \texttt{debt\_to\_equity\_fq} ma tylko 30 różnych wartości całkowitych, czyli źródło je zaokrągla. To obserwacje korelacyjne, nie dowód przyczynowości.
+
+Na Rys. \ref{fig:piec} widać, że średni log(C/Z) maleje wraz z ROE i marżą, ale zależność wygląda inaczej dla małych, średnich i dużych spółek oraz przy różnym zadłużeniu.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\columnwidth]{rysunki/fig_korelacje_nb.png}
+\caption{Korelacje Spearmana cech i log(C/Z) na zbiorze treningowym (z notatnika).}
+\label{fig:korelacje}
+\end{figure}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.8\textwidth]{rysunki/fig_piec_zmiennych_nb.png}
+\caption{Średni log(C/Z) w komórkach: ROE i marża netto (percentyle w treningu), osobno dla wielkości spółki (kolumny) i zadłużenia (wiersze). Kolor: średni log(C/Z) w komórce (z notatnika).}
+\label{fig:piec}
+\end{figure*}
+
+\section{Przegląd literatury}
+Problem wyceny przez C/Z jest opisany w podręcznikach z wyceny aktywów, a metody imputacji i regresji w standardowych podręcznikach statystyki i uczenia maszynowego. \pole{Przegląd publikacji na ten sam zbiór danych lub podobny do uzupełnienia.}
+
+\vfill\break
+\section{Protokół eksperymentu}
+\subsection{Podział i granica dopasowania}
+Podział jest grupowy: wiersze o identycznym wektorze 13 cech to jedna spółka i trafiają do jednego zbioru (\texttt{GroupShuffleSplit}). Sprawdziliśmy, że 366 z 3\,402 wierszy complete-case (10,8\%) ma taki sam wektor cech jak inny wiersz. To 130 grup, np. \texttt{NYSE:F} i \texttt{NYSE:F/PB} (akcje zwykłe i uprzywilejowane). W 75 z 130 grup kopie trafiłyby przy losowym podziale do różnych zbiorów, więc model widziałby firmę w treningu, a jej kopię w teście. Proporcje 70/15/15 to 3\,288 / 687 / 702 spółek, czyli dzielimy grupy, a nie wiersze. Wszystkie decyzje (imputacja, skalowanie, kodowanie, wybór metody) podejmujemy na treningu i walidacji. Zbiór testowy oceniamy jeden raz, na zamrożonej procedurze. Wynik zależy od podziału, więc powtarzamy proces dla 20 ziaren losowości (seed 42 oraz 0–18) i raportujemy średnią i odchylenie.
+
+\subsection{Metryka główna i miary pomocnicze}
+\noindent\textbf{Miara główna:} RMSE na skali $\log(\text{C/Z})$ (im niżej, tym lepiej). Jest w jednostkach celu.
+
+\noindent\textbf{Miary pomocnicze:} MAE na skali logarytmicznej; błąd procentowy $\exp(\text{MAE})-1$ (średni błąd C/Z w \%); MedAE w jednostkach C/Z (odporna na skrajne wartości); R$^2$ na skali logarytmicznej (ujemne oznacza gorsze od stałej średniej).
+
+\section{Preprocessing i baseline}
+\textbf{Dlaczego preprocessing jest trudny.} Każde przekształcenie to kompromis: logarytm celu, uzupełnianie braków zamiast usuwania spółek (usunięcie objęłoby głównie firmy finansowe), skalowanie rangowe zamiast standaryzacji (standaryzacja dawała RMSE około 10,7–11,2, bo skrajne wartości psuły skalę), odrzucenie części z 45 kolumn i prosty model bez strojenia.
+
+\textbf{Imputacja.} Braki uzupełniamy w potoku dopasowanym na treningu. Porównujemy średnią, medianę, modę, KNN (5 sąsiadów) i MICE (regresja). Tabela \ref{tab:walidacja} podaje RMSE dla 20 podziałów na walidacji. Wszystkie metody są wyraźnie lepsze od stałej średniej, a różnice między nimi są małe. Najniższe średnie RMSE ma moda, ale mediana była lepsza od stałej średniej w 20 z 20 podziałów. Wybieramy medianę jako prostszą i odporniejszą; uczciwie, moda jest średnio lepsza o 0,012, więc to decyzja o prostocie, a nie czysto najlepszy wynik.
+
+\begin{table}[H]
+\centering
+\caption{RMSE na skali log(C/Z), walidacja, 20 podziałów (średnia, odch.).}
+\label{tab:walidacja}
+\footnotesize
+\begin{tabularx}{\columnwidth}{@{}lYY@{}}
+\toprule
+Wersja & RMSE (średnia) & RMSE (odch.)\\
+\midrule
+braki uzupełnione średnią & 0,949 & 0,055\\
+braki uzupełnione medianą (wybrana) & 0,940 & 0,057\\
+braki uzupełnione modą & 0,928 & 0,059\\
+braki uzupełnione KNN (5 sąsiadów) & 0,939 & 0,054\\
+braki uzupełnione MICE (regresja) & 0,936 & 0,054\\
+bez modelu: stała średnia & 1,145 & 0,067\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Complete-case a imputacja.} Complete-case (usunięcie spółek z brakami) jest punktem odniesienia. Na tych samych 511 kompletnych spółkach walidacji wypada lepiej niż mediana z imputacją: RMSE 0,892 wobec 0,914 (średnio z 20 podziałów), a complete-case jest lepszy w 19 z 20 podziałów. Imputacja pozwala jednak ocenić wszystkie 687 spółek walidacji, w tym 176 z brakami: tam mediana ma RMSE 0,940. Dlatego to ona trafia do modelu.
+
+\textbf{Skalowanie i kodowanie.} Cechy liczbowe skalujemy rangowo (\texttt{RankScaler}): każda wartość zostaje zastąpiona jej pozycją w rozkładzie treningowym, przeliczoną na kwantyl normalny. Sektor kodujemy one-hot z kategorią odniesienia Finance (19 kolumn). Razem 32 kolumny wejściowe. Kolumny one-hot zostają 0/1 i nie są skalowane.
+
+\textbf{Model i baseline.} Regresja liniowa (\texttt{LinearRegression}) bez strojenia, celowo prosta. Baseline to stała średnia $\log(\text{C/Z})$ z treningu. Krzywa uczenia (Rys. \ref{fig:lc}) pokazuje, że RMSE spada z 0,959 (10\% treningu) do 0,898 (100\%), a przyrosty maleją. Walidacja i test są stałe.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.85\columnwidth]{rysunki/fig_krzywa_uczenia_nb.png}
+\caption{Krzywa uczenia: RMSE na walidacji w zależności od udziału treningu (z notatnika).}
+\label{fig:lc}
+\end{figure}
+
+\textbf{Wynik testowy.} Tabela \ref{tab:test} porównuje wybrany model z baseline na tych samych 702 spółkach. Wersja bez uzupełniania (533 spółki) wypada lepiej, ale mierzy inną populację, więc nie jest bezpośrednio porównywalna. Model jest o ok. 18\% lepszy od baseline, a jego błąd procentowy (90\%) pokazuje, jak niepewne są pojedyncze wyceny.
+
+\begin{table}[H]
+\centering
+\caption{Wyniki na zbiorze testowym (seed 42).}
+\label{tab:test}
+\footnotesize
+\begin{tabularx}{\columnwidth}{@{}lYYYY@{}}
+\toprule
+Wersja & RMSE & MAE & R$^2$ & MedAE C/Z\\
+\midrule
+bez braków (533 kompletne) & 0,831 & 0,605 & 0,349 & 8,81\\
+mediana (533 kompletne) & 0,851 & 0,609 & 0,316 & 8,62\\
+\textbf{mediana (wszystkie 702)} & \textbf{0,950} & \textbf{0,642} & \textbf{0,328} & \textbf{7,07}\\
+stała średnia (702) & 1,164 & 0,794 & $-$0,008 & 9,80\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Ograniczenia.} Jedna migawka danych nie pozwala testować stabilności w czasie. Braki dotyczą głównie spółek finansowych (94\% spółek z brakiem płynności to Finance), więc imputacja w tej branży to w dużej mierze wartość umowna. Model liniowy nie wyłapuje nieliniowości, a wynik jest dolną granicą możliwości. Wybór cech (45 do 16) może wpływać na wynik i wymaga dalszej weryfikacji.
+
+\FloatBarrier
+\end{document}

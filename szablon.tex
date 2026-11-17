@@ -1,0 +1,171 @@
+\documentclass[10pt,twocolumn,a4paper]{article}
+% Edycja: 30.10.2026. Kompilacja: pdfLaTeX + BibTeX.
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{polski,lmodern}
+\usepackage[margin=18mm,columnsep=7mm]{geometry}
+\usepackage{microtype,graphicx}
+\usepackage{booktabs,tabularx,array}
+\usepackage{amsmath,amssymb}
+\usepackage{enumitem,placeins,xcolor,xurl,float,needspace,etoolbox}
+\usepackage[hidelinks,breaklinks=true]{hyperref}
+\hypersetup{pdftitle={MOW II -- szablon raportu projektowego}}
+\setlist[itemize]{leftmargin=*,itemsep=1pt,topsep=3pt}
+\setlist[description]{leftmargin=0pt,labelsep=4pt,itemsep=3pt}
+\setlength{\emergencystretch}{1em}
+\raggedbottom
+\pretocmd{\section}{\Needspace{6\baselineskip}}{}{}
+\pretocmd{\subsection}{\Needspace{5\baselineskip}}{}{}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\renewcommand{\abstractname}{Streszczenie}
+\renewcommand{\refname}{Bibliografia}
+
+% Dane do zmiany przez zespół.
+\newcommand{\TematProjektu}{Tytuł projektu}
+\newcommand{\TypZadania}{Klasyfikacja albo regresja}
+% Szare akapity są wskazówkami, nie treścią gotowego raportu.
+% Po napisaniu własnej treści: \wskazowkifalse
+\newif\ifwskazowki
+\wskazowkitrue
+\newcommand{\wskazowka}[1]{\ifwskazowki
+  \par\begingroup\small\color{black!72}\raggedright#1\par\endgroup\fi}
+\newcommand{\pole}[1]{\textit{[#1]}}
+
+\title{\TematProjektu\\[2mm]
+\large Zaawansowane metody uczenia maszynowego}
+\author{Imię i nazwisko autora 1\\\small Numer albumu
+\and Imię i nazwisko autora 2\\\small Numer albumu}
+\date{\quad \today}
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\wskazowka{W wersji końcowej: problem, dane, protokół oceny,
+najważniejszy wynik liczbowy względem baseline i ograniczenie.
+W R1 przedstaw cel i plan; zaznacz, że finalne wyniki jeszcze nie istnieją.
+Streszczenie aktualizujemy po każdej iteracji, generalnie powinno tutaj być 
+zachowane streszczenie na max pół strony o całości projektu}
+\end{abstract}
+
+\section*{Zasady i rozwój raportu}
+\wskazowka{To jeden dokument rozwijany iteracyjnie. W kolejnych
+wersjach poprawiamy również wcześniejsze części i wnioski jeśli będzie taka potrzeba.}
+
+
+\wskazowka{Raport przygotowujemy w \LaTeX{} (lub jak ktoś nie lubi moze byc doc) i oddajemy jako PDF.
+Jedna osoba przekazuje na Delcie raport oraz kod projektu w imieniu
+zespołu. Można pracować wspólnie w Overleaf, ale wybór edytora jest dowolny.
+Kod powinien mieć instrukcję uruchomienia i opis środowiska (Docker?)}
+
+\wskazowka{Wskazówki, moje uwagi i pola w nawiasach zastępuje własna treść, proszę oczywiście pousuwać to co jest obecnie wypełnione. Szablon jest poglądowy, mogą Państwo zmieniać wedle uznania}
+
+\section{Problem, motywacja i cel}
+\subsection{Pytanie predykcyjne}
+\wskazowka{Zdefiniuj jednostkę obserwacji, cel i moment predykcji:
+dla jakiego obiektu, kiedy i na podstawie jakich dostępnych informacji
+przewidujemy jaką wielkość? Jaki jest postawiony nasz cel "biznesowy" ?
+Opisz zastosowanie i odbiorce projektu.}
+
+\noindent\textbf{Typ zadania:} \TypZadania.
+
+\noindent\textbf{Kontrakt predykcji:}
+\pole{jednostka -- moment -- dostępne cechy -- cel -- zastosowanie etc etc}.
+
+\subsection{Kryterium użyteczności}
+\wskazowka{Wyjaśnij, co model ma wnieść ponad prosty punkt odniesienia.}
+
+\section{Dane i analiza wstępna}
+\subsection{Źródło i znaczenie kolumn}
+\wskazowka{Podaj źródło, autora, odnośnik lub DOI, wersję/datę pobrania
+i warunki wykorzystania danych. Opisz pozyskanie, populację,
+liczbę rekordów i cech oraz ich znaczenie. Potwierdź zgodność
+z wymaganiami zaakceptowanymi przez prowadzącego.}
+
+\begin{table}[H]
+\centering
+\caption{Skrócony słownik danych: znaczenie, jednostka i dostępność.}
+\label{tab:dane}
+\footnotesize
+\begin{tabularx}{\columnwidth}{@{}lYY@{}}
+\toprule
+Kolumna & Znaczenie / jednostka & Rola / dostępność\\
+\midrule
+\texttt{cecha\_1} & \pole{opis} & \pole{przed predykcją?}\\
+\texttt{cecha\_2} & \pole{opis} & \pole{przed predykcją?}\\
+\texttt{cel} & \pole{etykieta lub jednostka} & Zmienna zależna\\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{Jakość i struktura danych}
+\wskazowka{Opisz braki, błędy, duplikaty, rzadkie kategorie, wartości
+odstające i zależności wierszy. Oczywiście na bazie wykresów. Kazdy wykres musi mieć referencje w tekście oraz opis. Nie wrzucamy kodu do raportu. Klasyfikacja: liczebności i udziały klas.
+Regresja: rozkład celu i jednostka.}
+
+\wskazowka{Jeśli braki lub błędy dodano ręcznie, podaj mechanizm,
+kolumny, nasilenie, ziarno i pule objęte zmianą. Zachowaj dane
+oryginalne. }
+
+\subsection{Najważniejsze obserwacje z EDA}
+\wskazowka{Wybierz wykresy wspierające argumentację i zinterpretuj
+je w tekście. Analizy służące wyborowi procedury wykonuj na train.
+Nie analizuj końcowego testu w celu doboru metod.
+Oddziel obserwację od hipotezy i zależność od przyczynowości.}
+
+\section{Przegląd literatury}
+\wskazowka{Omów prace dotyczące problemu, danych i adekwatnych metod.
+Wskaż zadanie, dane, protokół, wynik i związek z własnym projektem.
+Liczby z innych populacji i podziałów nie są bezpośrednio porównywalne.
+Dokumentacja biblioteki nie zastępuje badań z publikacji. Najlepiej publikacje operujące na tym samym zbiorze, ale jeśli nie ma to cos podobnego}
+
+\section{Protokół eksperymentu}
+\subsection{Podział i granica dopasowania}
+\wskazowka{Uzasadnij podział losowy, stratyfikowany, grupowy lub
+czasowy względem przyszłego użycia. Podaj liczebności, proporcje,
+ziarna i sposób utrwalenia indeksów. Opisz kontrolę powtórzeń
+i przenikania informacji. Wiele wierszy nie oznacza automatycznie
+wielu niezależnych obiektów. Mocno uzasadnij dlaczego podział jest poprawny i co zostało wzięte pod uwagę}
+
+\begin{itemize}
+\item \textbf{Train:} dopasowanie i wewnętrzna CV.
+\item \textbf{Validation:} rozwój i wybór rozwiązania; nie jest końcowym potwierdzeniem.
+\item \textbf{Test:} ocena zamrożonej procedury.
+\end{itemize}
+
+\wskazowka{
+Preprocessing, selekcja i uczone transformacje muszą być dopasowane
+na właściwej części treningowej, także w CV. Proporcje z wykładów
+są przykładem, a nie uniwersalną regułą - można sobie dobierać parametry zgodnie z własną intuicją}
+
+\subsection{Metryka główna i miary pomocnicze}
+\wskazowka{Wybór miar i uzasadnienie }
+
+\paragraph{Wariant: klasyfikacja.}
+\wskazowka{Określ klasę pozytywną i znaczenie FP/FN. Uzasadnij
+miarę decyzji (np. F$_\beta$, recall przy ograniczeniu precision,
+balanced accuracy), rankingu (AP, ROC AUC) lub prawdopodobieństw
+(log loss, Brier). Samo accuracy może ukrywać ignorowanie
+rzadkiej klasy. W zadaniu wieloklasowym podaj wyniki klas i sposób uśredniania.}
+
+\paragraph{Wariant: regresja.}
+\wskazowka{Uzasadnij MAE, RMSE lub inne kryterium i podaj jednostkę.
+MAE/RMSE mają jednostkę celu, MSE jednostkę kwadratową, R$^2$ może być
+ujemne.}
+
+\noindent\textbf{Miara główna:} \pole{nazwa, kierunek, uzasadnienie}.
+
+\noindent\textbf{Miary pomocnicze:} \pole{nazwy i rola}.
+
+\section{Preprocessing i baseline}
+\wskazowka{Opisz rzeczywiście użyte imputacje, kodowanie, skalowanie,
+filtrowanie lub transformację. Podaj kolejność i miejsce
+dopasowania każdego etapu oraz uzasadnienie dla wybranych modeli.
+Nie usuwaj trudnych przykładów z validation/test w celu poprawy wyniku ani innych rekordów bez jasnego uzasadnienia}
+
+\wskazowka{Zdefiniuj prosty baseline}
+
+\FloatBarrier
+\clearpage
+\bibliographystyle{plain}
+\bibliography{bibliography}
+\end{document}
